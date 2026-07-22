@@ -29,7 +29,11 @@ import g4 from "@/assets/gallery-4.jpg";
 import g5 from "@/assets/gallery-5.jpg";
 import g6 from "@/assets/gallery-6.jpg";
 
-const Lightbox = lazy(() => import("yet-another-react-lightbox"));
+const Lightbox = lazy(async () => {
+  await import("yet-another-react-lightbox/styles.css");
+  return import("yet-another-react-lightbox");
+});
+
 
 export const Route = createFileRoute("/")({
   component: LandingPage,
