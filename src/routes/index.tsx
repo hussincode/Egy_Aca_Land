@@ -23,6 +23,9 @@ import {
   Waves,
   Dumbbell,
   ArrowUpRight,
+  Check,
+  Newspaper,
+  ExternalLink,
 } from "lucide-react";
 import useEmblaCarousel from "embla-carousel-react";
 
@@ -59,18 +62,142 @@ export const Route = createFileRoute("/")({
 const HERO_VIDEO =
   "https://assets.mixkit.co/videos/preview/mixkit-athlete-running-in-a-track-1543-large.mp4";
 
+/* ---------- LOCAL STORAGE HELPERS & BACKEND SYNC ---------- */
+const LANDING_API = (import.meta.env.VITE_API_BASE || "https://egyacaback.vercel.app") + "/api/landing-settings";
+
+async function fetchLandingSettings(): Promise<Record<string, unknown>> {
+  try {
+    const res = await fetch(LANDING_API, { cache: "no-store" });
+    if (res.ok) {
+      const payload = await res.json();
+      return (payload?.data as Record<string, unknown>) ?? {};
+    }
+  } catch {}
+  return {};
+}
+
+function useLocalStorageData<T>(key: string, fallback: T): T {
+  const [data, setData] = useState<T>(() => {
+    if (typeof window === "undefined") return fallback;
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : fallback;
+    } catch {
+      return fallback;
+    }
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const applyValue = (val: unknown) => {
+      if (cancelled || val === undefined) return;
+      setData(val as T);
+      try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+    };
+
+    const syncFromApi = async () => {
+      const settings = await fetchLandingSettings();
+      if (settings[key] !== undefined) applyValue(settings[key]);
+    };
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== key) return;
+      try {
+        if (e.newValue) setData(JSON.parse(e.newValue) as T);
+      } catch {}
+    };
+
+    // BroadcastChannel for same-origin cross-tab sync
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("landing_settings_sync");
+      bc.onmessage = (e: MessageEvent) => {
+        const msg = e.data as Record<string, unknown>;
+        if (msg[key] !== undefined) applyValue(msg[key]);
+      };
+    } catch {}
+
+    syncFromApi();
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", syncFromApi);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", syncFromApi);
+      bc?.close();
+    };
+  }, [key]);
+
+  return data;
+}
+
+function useLocalStorageString(key: string, fallback = ""): string {
+  const [data, setData] = useState<string>(() => {
+    if (typeof window === "undefined") return fallback;
+    return localStorage.getItem(key) || fallback;
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const applyValue = (val: string) => {
+      if (cancelled) return;
+      setData(val);
+      try { localStorage.setItem(key, val); } catch {}
+    };
+
+    const syncFromApi = async () => {
+      const settings = await fetchLandingSettings();
+      const val = settings[key];
+      if (typeof val === "string") applyValue(val);
+      else setData(localStorage.getItem(key) || fallback);
+    };
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== key) return;
+      setData(e.newValue || fallback);
+    };
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("landing_settings_sync");
+      bc.onmessage = (e: MessageEvent) => {
+        const msg = e.data as Record<string, unknown>;
+        if (typeof msg[key] === "string") applyValue(msg[key] as string);
+      };
+    } catch {}
+
+    syncFromApi();
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", syncFromApi);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", syncFromApi);
+      bc?.close();
+    };
+  }, [key, fallback]);
+
+  return data;
+}
+
 function LandingPage() {
   const isMobile = useIsMobile();
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
+    <div dir="rtl" className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
       <Navbar />
       <Hero isMobile={isMobile} />
       <About isMobile={isMobile} />
       <Sports isMobile={isMobile} />
       <Branches />
+      <Pricing />
       <Gallery />
       <Coaches />
       <Testimonials />
+      <NewsSection />
       <FAQ />
       <Contact />
       <Footer />
@@ -83,6 +210,9 @@ function LandingPage() {
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const generalSettings = useLocalStorageData<{ academyName?: string }>("system_settings_general", {});
+  const brandName = generalSettings?.academyName || "APEX";
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
     onScroll();
@@ -91,12 +221,13 @@ function Navbar() {
   }, []);
 
   const links = [
-    ["About", "#about"],
-    ["Sports", "#sports"],
-    ["Branches", "#branches"],
-    ["Gallery", "#gallery"],
-    ["Coaches", "#coaches"],
-    ["Contact", "#contact"],
+    ["من نحن", "#about"],
+    ["الرياضات", "#sports"],
+    ["الفروع", "#branches"],
+    ["الأسعار", "#pricing"],
+    ["المعرض", "#gallery"],
+    ["المدربون", "#coaches"],
+    ["تواصل معنا", "#contact"],
   ];
 
   return (
@@ -111,7 +242,7 @@ function Navbar() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6">
           <a
             href="#top"
-            className="flex items-center gap-2 font-display text-lg font-bold tracking-tight"
+            className="flex items-center gap-2 font-display text-lg font-bold tracking-tight uppercase"
           >
             <span
               className="grid h-9 w-9 place-items-center rounded-xl"
@@ -119,7 +250,7 @@ function Navbar() {
             >
               <Trophy className="h-4 w-4 text-white" strokeWidth={2.5} />
             </span>
-            APEX<span className="text-gradient">.</span>
+            {brandName}<span className="text-gradient">.</span>
           </a>
           <nav className="hidden items-center gap-8 md:flex">
             {links.map(([label, href]) => (
@@ -134,14 +265,14 @@ function Navbar() {
           </nav>
           <div className="hidden md:flex items-center gap-3">
             <Link to="/join-as-coach" className="btn-ghost text-sm py-2.5 px-5">
-              Join as Coach
+              انضم كمدرب
             </Link>
             <a href="#contact" className="btn-primary text-sm py-2.5 px-5">
-              Join Now <ArrowRight className="h-4 w-4" />
+              انضم الآن <ArrowRight className="h-4 w-4" />
             </a>
           </div>
           <button
-            aria-label="Open menu"
+            aria-label="فتح القائمة"
             onClick={() => setOpen(true)}
             className="grid h-11 w-11 place-items-center rounded-full border border-white/15 md:hidden"
           >
@@ -159,10 +290,10 @@ function Navbar() {
           >
             <div className="flex items-center justify-between p-6">
               <span className="font-display text-lg font-bold">
-                APEX<span className="text-gradient">.</span>
+                {brandName}<span className="text-gradient">.</span>
               </span>
               <button
-                aria-label="Close"
+                aria-label="إغلاق"
                 onClick={() => setOpen(false)}
                 className="grid h-11 w-11 place-items-center rounded-full border border-white/15"
               >
@@ -185,14 +316,14 @@ function Navbar() {
                 onClick={() => setOpen(false)}
                 className="btn-ghost mt-8 w-full text-center"
               >
-                Join as Coach
+                انضم كمدرب
               </Link>
               <a
                 href="#contact"
                 onClick={() => setOpen(false)}
                 className="btn-primary mt-4 w-full text-center justify-center"
               >
-                Join Now <ArrowRight className="h-4 w-4" />
+                انضم الآن <ArrowRight className="h-4 w-4" />
               </a>
             </nav>
           </motion.div>
@@ -210,27 +341,35 @@ function Hero({ isMobile }: { isMobile: boolean }) {
   const scale = useTransform(scrollYProgress, [0, 1], [1, 1.1]);
   const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
+  const heroSettings = useLocalStorageData<{ title?: string; subtitle?: string; videoUrl?: string; bgType?: string; imageUrl?: string }>("landing_hero_settings", {});
+  const heroImagePreview = useLocalStorageString("landing_hero_image", "");
+
+  const displayVideo = heroSettings?.videoUrl || HERO_VIDEO;
+  const displayImage = heroImagePreview || heroSettings?.imageUrl || heroPoster;
+  const isImageMode = heroSettings?.bgType === "image" || Boolean(heroImagePreview || heroSettings?.imageUrl);
+
   return (
     <section id="top" ref={ref} className="relative h-[100svh] w-full overflow-hidden">
       <motion.div style={isMobile ? undefined : { y, scale }} className="absolute inset-0">
-        {!isMobile && (
+        {!isMobile && !isImageMode && (
           <video
+            key={displayVideo}
             autoPlay
             muted
             loop
             playsInline
             preload="none"
-            poster={heroPoster}
+            poster={displayImage}
             className="absolute inset-0 h-full w-full object-cover"
           >
-            <source src={HERO_VIDEO} type="video/mp4" />
+            <source src={displayVideo} type="video/mp4" />
           </video>
         )}
         <img
-          src={heroPoster}
+          src={displayImage}
           alt=""
           fetchPriority="high"
-          className={`absolute inset-0 h-full w-full object-cover ${isMobile ? "" : "opacity-0"}`}
+          className={`absolute inset-0 h-full w-full object-cover ${(!isMobile && !isImageMode) ? "opacity-0" : ""}`}
         />
         <div className="absolute inset-0" style={{ background: "var(--gradient-hero)" }} />
         <div className="absolute inset-0" style={{ background: "var(--gradient-radial)" }} />
@@ -248,7 +387,7 @@ function Hero({ isMobile }: { isMobile: boolean }) {
             className="eyebrow mb-6"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.75_0.2_55)] animate-pulse" />
-            Multi-Sport Academy · Est. 2009
+            أكاديمية رياضات متعددة · تأسست 2009
           </motion.span>
           <motion.h1
             initial={{ opacity: 0, y: 40 }}
@@ -256,8 +395,14 @@ function Hero({ isMobile }: { isMobile: boolean }) {
             transition={{ delay: 0.35, duration: 0.9 }}
             className="max-w-5xl font-display text-[13vw] font-bold leading-[0.9] tracking-tight md:text-[7.5rem] lg:text-[9rem]"
           >
-            Train like <br />
-            you <span className="text-gradient italic">mean</span> it.
+            {heroSettings?.title ? (
+              heroSettings.title
+            ) : (
+              <>
+                تدرّب وكأن <br />
+                النتيجة <span className="text-gradient italic">تستحق</span>.
+              </>
+            )}
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -265,8 +410,7 @@ function Hero({ isMobile }: { isMobile: boolean }) {
             transition={{ delay: 0.6 }}
             className="mt-8 max-w-xl text-base text-white/70 md:text-lg"
           >
-            Seven disciplines. Six branches. One relentless standard. Apex is where the next
-            generation of athletes is built — from first steps to podium finishes.
+            {heroSettings?.subtitle || "سبع رياضات. ستة فروع. معيار واحد لا يهادن. هنا يُصنع جيل الأبطال القادم — من الخطوة الأولى حتى منصة التتويج."}
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -275,16 +419,16 @@ function Hero({ isMobile }: { isMobile: boolean }) {
             className="mt-10 flex flex-wrap items-center gap-4"
           >
             <a href="#contact" className="btn-primary">
-              Join Now <ArrowRight className="h-4 w-4" />
+              انضم الآن <ArrowRight className="h-4 w-4" />
             </a>
             <Link to="/join-as-coach" className="btn-ghost">
-              Join as Coach
+              انضم كمدرب
             </Link>
             <a
               href="#branches"
               className="btn-ghost border-transparent bg-white/5 hover:bg-white/10"
             >
-              <MapPin className="h-4 w-4" /> View Branches
+              <MapPin className="h-4 w-4" /> عرض الفروع
             </a>
           </motion.div>
         </div>
@@ -297,7 +441,7 @@ function Hero({ isMobile }: { isMobile: boolean }) {
         className="absolute bottom-8 left-1/2 z-10 hidden -translate-x-1/2 flex-col items-center gap-2 md:flex"
       >
         <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/50">
-          Scroll
+          انزل
         </span>
         <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 2, repeat: Infinity }}>
           <ChevronDown className="h-4 w-4 text-white/60" />
@@ -366,18 +510,21 @@ function About({ isMobile }: { isMobile: boolean }) {
   const imgY = useTransform(scrollYProgress, [0, 1], ["-6%", "12%"]);
 
   const timeline = [
-    { year: "2009", text: "Founded with a single football pitch and 40 students." },
-    { year: "2014", text: "Expanded to swimming, basketball & karate; opened branch #2." },
-    { year: "2019", text: "National championship titles across four disciplines." },
-    { year: "2026", text: "Six branches, 4,000+ active athletes, world-class staff." },
+    { year: "2009", text: "التأسيس بملعب كرة قدم واحد و40 طالباً." },
+    { year: "2014", text: "التوسع نحو السباحة والسلة والكاراتيه؛ افتتاح الفرع الثاني." },
+    { year: "2019", text: "ألقاب بطولية وطنية عبر أربع رياضات مختلفة." },
+    { year: "2026", text: "ستة فروع، أكثر من 4,000 رياضي نشط، وكوادر تدريبية عالمية." },
   ];
 
   const stats = [
-    { n: 4000, s: "+", label: "Active athletes" },
-    { n: 6, s: "", label: "Branches" },
-    { n: 120, s: "+", label: "Certified coaches" },
-    { n: 47, s: "", label: "National titles" },
+    { n: 4000, s: "+", label: "رياضي نشط" },
+    { n: 6, s: "", label: "فروع" },
+    { n: 120, s: "+", label: "مدرب معتمد" },
+    { n: 47, s: "", label: "لقب وطني" },
   ];
+
+  const ceoPhoto = useLocalStorageString("landing_ceo_photo", "") || useLocalStorageData<{ photo?: string }>("landing_ceo_settings", {}).photo;
+  const displayAboutImg = ceoPhoto || aboutImg;
 
   return (
     <section id="about" ref={ref} className="section-pad relative">
@@ -396,8 +543,8 @@ function About({ isMobile }: { isMobile: boolean }) {
               style={{ boxShadow: "var(--shadow-card)" }}
             >
               <motion.img
-                src={aboutImg}
-                alt="Inside Apex Academy"
+                src={displayAboutImg}
+                alt="Inside Academy"
                 loading="lazy"
                 width={1600}
                 height={1200}
@@ -415,9 +562,9 @@ function About({ isMobile }: { isMobile: boolean }) {
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-widest text-white/60">
-                      Certified Excellence
+                      تميز معتمد
                     </p>
-                    <p className="text-sm font-semibold">FIFA · FINA · FIBA accredited</p>
+                    <p className="text-sm font-semibold">معتمد من FIFA · FINA · FIBA</p>
                   </div>
                 </div>
               </div>
@@ -426,18 +573,17 @@ function About({ isMobile }: { isMobile: boolean }) {
 
           <div>
             <Reveal>
-              <span className="eyebrow">About Apex</span>
+              <span className="eyebrow">من نحن</span>
             </Reveal>
             <Reveal delay={0.05}>
               <h2 className="mt-6 font-display text-5xl font-bold leading-[1.02] tracking-tight md:text-6xl">
-                Seventeen years of building <span className="text-gradient">champions</span>.
+                سبعة عشر عاماً في صناعة <span className="text-gradient">الأبطال</span>.
               </h2>
             </Reveal>
             <Reveal delay={0.1}>
               <p className="mt-6 max-w-xl text-lg text-muted-foreground">
-                Apex is a multi-disciplinary sports institution built on the belief that world-class
-                training belongs to everyone. Our athletes don't just play — they train with
-                intention, structure, and the tools used by professionals.
+                أكاديميتنا مؤسسة رياضية متعددة التخصصات، تؤمن بأن التدريب العالمي حق للجميع.
+                رياضيونا لا يكتفون باللعب — بل يتدربون بنية وهدف وبالأدوات التي يستخدمها المحترفون.
               </p>
             </Reveal>
 
@@ -458,7 +604,7 @@ function About({ isMobile }: { isMobile: boolean }) {
 
             <div className="mt-16">
               <h3 className="font-display text-sm uppercase tracking-[0.3em] text-muted-foreground">
-                Our Journey
+                مسيرتنا
               </h3>
               <ol className="mt-6 relative border-l border-white/10 pl-8">
                 {timeline.map((t, i) => (
@@ -481,19 +627,17 @@ function About({ isMobile }: { isMobile: boolean }) {
             <div className="mt-14 grid gap-6 md:grid-cols-2">
               <Reveal>
                 <div className="glass rounded-2xl p-6">
-                  <p className="text-xs uppercase tracking-widest text-gradient">Mission</p>
+                  <p className="text-xs uppercase tracking-widest text-gradient">رسالتنا</p>
                   <p className="mt-3 text-base leading-relaxed">
-                    Empower every athlete with the coaching, facilities, and community to reach
-                    their absolute peak.
+                    تمكين كل رياضي من خلال التدريب الاحترافي والمرافق المتطورة والمجتمع الداعم للوصول إلى أعلى مستوياته.
                   </p>
                 </div>
               </Reveal>
               <Reveal delay={0.1}>
                 <div className="glass rounded-2xl p-6">
-                  <p className="text-xs uppercase tracking-widest text-gradient">Vision</p>
+                  <p className="text-xs uppercase tracking-widest text-gradient">رؤيتنا</p>
                   <p className="mt-3 text-base leading-relaxed">
-                    The most respected multi-sports academy in the region — a name synonymous with
-                    discipline and results.
+                    أن نكون الأكاديمية الرياضية المتعددة الأكثر احتراماً في المنطقة — اسم مرادف للانضباط والنتائج.
                   </p>
                 </div>
               </Reveal>
@@ -507,50 +651,29 @@ function About({ isMobile }: { isMobile: boolean }) {
 
 /* ---------- SPORTS ---------- */
 function Sports({ isMobile }: { isMobile: boolean }) {
-  const sports = [
-    {
-      name: "Football",
-      tag: "Team · Outdoor",
-      img: sFootball,
-      desc: "Youth to elite squads with match-day tactics.",
-    },
-    {
-      name: "Swimming",
-      tag: "Individual · Aquatic",
-      img: sSwimming,
-      desc: "Olympic-size pools, video stroke analysis.",
-    },
-    {
-      name: "Basketball",
-      tag: "Team · Indoor",
-      img: sBasketball,
-      desc: "Fundamentals, athleticism, and IQ.",
-    },
-    {
-      name: "Volleyball",
-      tag: "Team · Indoor/Beach",
-      img: sVolleyball,
-      desc: "Power, control, and system play.",
-    },
-    {
-      name: "Karate",
-      tag: "Martial · Discipline",
-      img: sKarate,
-      desc: "Kata, kumite, and belt progression.",
-    },
-    {
-      name: "Gymnastics",
-      tag: "Individual · Artistic",
-      img: sGymnastics,
-      desc: "Strength, flexibility, competition prep.",
-    },
-    {
-      name: "Fitness",
-      tag: "Strength · Conditioning",
-      img: sFitness,
-      desc: "Small-group strength, mobility, HIIT.",
-    },
+  const defaultSports = [
+    { name: "كرة القدم", tag: "جماعي · خارجي", img: sFootball, desc: "من الناشئين حتى الفرق الاحترافية مع تكتيكات المباريات." },
+    { name: "السباحة", tag: "فردي · مائي", img: sSwimming, desc: "حمامات أولمبية وتحليل فيديو لتقنية السباحة." },
+    { name: "كرة السلة", tag: "جماعي · صالة", img: sBasketball, desc: "الأساسيات والرشاقة والذكاء الرياضي." },
+    { name: "الكرة الطائرة", tag: "جماعي · صالة/شاطئ", img: sVolleyball, desc: "القوة والدقة واللعب المنظومي." },
+    { name: "الكاراتيه", tag: "فنون قتالية · انضباط", img: sKarate, desc: "الكاتا والكوميتيه والتقدم في الأحزمة." },
+    { name: "الجمباز", tag: "فردي · فني", img: sGymnastics, desc: "القوة والمرونة والتحضير للبطولات." },
+    { name: "اللياقة البدنية", tag: "قوة · تكييف", img: sFitness, desc: "مجموعات صغيرة وتمارين قوة ومرونة وهيت." },
   ];
+
+  const customSports = useLocalStorageData<Array<{ name: string; tag: string; desc: string; image: string }>>("landing_sports", []);
+  const customTitle = useLocalStorageString("landing_sports_title", "");
+
+  const sports = (customSports && customSports.length > 0)
+    ? customSports.map((s) => ({ name: s.name, tag: s.tag, img: s.image || sFootball, desc: s.desc }))
+    : defaultSports;
+
+  // Parse title: if it contains " · " or "." split into two parts for styling
+  const titleParts = customTitle
+    ? customTitle.split(/\n/)
+    : ["سبع رياضات.", "معيار واحد."];
+  const titleLine1 = titleParts[0] ?? "سبع رياضات.";
+  const titleLine2 = titleParts[1] ?? "معيار واحد.";
 
   return (
     <section id="sports" className="section-pad relative">
@@ -558,26 +681,25 @@ function Sports({ isMobile }: { isMobile: boolean }) {
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
           <div className="max-w-2xl">
             <Reveal>
-              <span className="eyebrow">Disciplines</span>
+              <span className="eyebrow">التخصصات</span>
             </Reveal>
             <Reveal delay={0.05}>
               <h2 className="mt-6 font-display text-5xl font-bold leading-[1.02] tracking-tight md:text-6xl">
-                Seven sports. <br />
-                <span className="text-gradient">One standard.</span>
+                {titleLine1} <br />
+                <span className="text-gradient">{titleLine2}</span>
               </h2>
             </Reveal>
           </div>
           <Reveal delay={0.1}>
             <p className="max-w-sm text-muted-foreground">
-              Each discipline runs on its own periodized program — designed by specialists,
-              delivered by pros.
+              كل رياضة تسير وفق برنامج تدريبي دوري مصمم من متخصصين ويُنفَّذ من محترفين.
             </p>
           </Reveal>
         </div>
 
         <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {sports.map((s, i) => (
-            <SportCard key={s.name} sport={s} index={i} disableTilt={isMobile} />
+            <SportCard key={`${s.name}-${i}`} sport={s} index={i} disableTilt={isMobile} />
           ))}
         </div>
       </div>
@@ -659,73 +781,55 @@ function SportCard({
 
 /* ---------- BRANCHES ---------- */
 function Branches() {
-  const branches = [
-    {
-      name: "Downtown Flagship",
-      city: "Central District",
-      addr: "127 Athletic Blvd",
-      sports: 7,
-      map: "https://www.google.com/maps/search/?api=1&query=Central+District+Athletic",
-    },
-    {
-      name: "Riverside Complex",
-      city: "West Bank",
-      addr: "88 Marina Way",
-      sports: 5,
-      map: "https://www.google.com/maps/search/?api=1&query=Riverside+Sports",
-    },
-    {
-      name: "Northgate Arena",
-      city: "North Hills",
-      addr: "12 Summit Ave",
-      sports: 6,
-      map: "https://www.google.com/maps/search/?api=1&query=Northgate+Arena",
-    },
-    {
-      name: "Coastal Center",
-      city: "Bayside",
-      addr: "540 Shoreline Dr",
-      sports: 4,
-      map: "https://www.google.com/maps/search/?api=1&query=Coastal+Sports",
-    },
-    {
-      name: "Eastside Hub",
-      city: "Old Town",
-      addr: "3 Heritage Sq",
-      sports: 5,
-      map: "https://www.google.com/maps/search/?api=1&query=Eastside+Sports",
-    },
-    {
-      name: "Highlands Elite",
-      city: "The Highlands",
-      addr: "600 Ridge Pkwy",
-      sports: 6,
-      map: "https://www.google.com/maps/search/?api=1&query=Highlands+Sports",
-    },
+  const defaultBranches = [
+    { name: "Downtown Flagship", city: "Central District", addr: "127 Athletic Blvd", sports: "7 sports", map: "https://www.google.com/maps/search/?api=1&query=Central+District+Athletic", image: "" },
+    { name: "Riverside Complex", city: "West Bank", addr: "88 Marina Way", sports: "5 sports", map: "https://www.google.com/maps/search/?api=1&query=Riverside+Sports", image: "" },
+    { name: "Northgate Arena", city: "North Hills", addr: "12 Summit Ave", sports: "6 sports", map: "https://www.google.com/maps/search/?api=1&query=Northgate+Arena", image: "" },
+    { name: "Coastal Center", city: "Bayside", addr: "540 Shoreline Dr", sports: "4 sports", map: "https://www.google.com/maps/search/?api=1&query=Coastal+Sports", image: "" },
+    { name: "Eastside Hub", city: "Old Town", addr: "3 Heritage Sq", sports: "5 sports", map: "https://www.google.com/maps/search/?api=1&query=Eastside+Sports", image: "" },
+    { name: "Highlands Elite", city: "The Highlands", addr: "600 Ridge Pkwy", sports: "6 sports", map: "https://www.google.com/maps/search/?api=1&query=Highlands+Sports", image: "" },
   ];
+
+  const customBranches = useLocalStorageData<Array<{ name: string; description?: string; mapsUrl?: string; image?: string }>>("landing_branches", []);
+  
+  const branches = customBranches.length > 0
+    ? customBranches.map((b) => ({
+        name: b.name,
+        city: "فرع الأكاديمية",
+        addr: b.description || "العنوان والتفاصيل",
+        sports: "متعدد الرياضات",
+        map: b.mapsUrl || "https://maps.google.com",
+        image: b.image || "",
+      }))
+    : defaultBranches;
 
   return (
     <section id="branches" className="section-pad relative">
       <div className="mx-auto max-w-7xl px-6">
         <div className="max-w-2xl">
           <Reveal>
-            <span className="eyebrow">Locations</span>
+            <span className="eyebrow">المواقع</span>
           </Reveal>
           <Reveal delay={0.05}>
             <h2 className="mt-6 font-display text-5xl font-bold leading-[1.02] tracking-tight md:text-6xl">
-              Six branches. <br />
-              <span className="text-gradient">One family.</span>
+              {branches.length} فروع. <br />
+              <span className="text-gradient">عائلة واحدة.</span>
             </h2>
           </Reveal>
         </div>
 
         <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {branches.map((b, i) => (
-            <Reveal key={b.name} delay={i * 0.05}>
+            <Reveal key={`${b.name}-${i}`} delay={i * 0.05}>
               <div
-                className="group relative overflow-hidden rounded-3xl border border-white/5 bg-card p-8 transition-all duration-500 hover:border-white/15 hover:-translate-y-2"
+                className="group relative overflow-hidden rounded-3xl border border-white/5 bg-card p-8 transition-all duration-500 hover:border-white/15 hover:-translate-y-2 flex flex-col justify-between"
                 style={{ boxShadow: "var(--shadow-soft)" }}
               >
+                {b.image && (
+                  <div className="absolute inset-0 -z-10 opacity-30 group-hover:opacity-40 transition-opacity">
+                    <img src={b.image} alt={b.name} className="h-full w-full object-cover" />
+                  </div>
+                )}
                 <div
                   className="absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
                   style={{
@@ -739,7 +843,7 @@ function Branches() {
                       <MapPin className="h-5 w-5" />
                     </div>
                     <span className="rounded-full border border-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                      {b.sports} sports
+                      {b.sports}
                     </span>
                   </div>
                   <h3 className="mt-8 font-display text-2xl font-bold">{b.name}</h3>
@@ -751,7 +855,7 @@ function Branches() {
                     rel="noreferrer"
                     className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-white transition-colors group-hover:text-[oklch(0.85_0.13_60)]"
                   >
-                    Open in Maps <ArrowUpRight className="h-4 w-4" />
+                    افتح في الخرائط <ArrowUpRight className="h-4 w-4" />
                   </a>
                 </div>
               </div>
@@ -763,9 +867,83 @@ function Branches() {
   );
 }
 
+/* ---------- PRICING ---------- */
+function Pricing() {
+  const customPlans = useLocalStorageData<Array<{ name: string; originalPrice?: string | null; price: string; features: string[]; isFeatured?: boolean }>>("landing_pricing_plans", []);
+  if (!customPlans || customPlans.length === 0) return null;
+
+  return (
+    <section id="pricing" className="section-pad relative">
+      <div className="mx-auto max-w-7xl px-6">
+        <div className="max-w-2xl">
+          <Reveal>
+            <span className="eyebrow">باقات العضوية</span>
+          </Reveal>
+          <Reveal delay={0.05}>
+            <h2 className="mt-6 font-display text-5xl font-bold leading-[1.02] tracking-tight md:text-6xl">
+              اختر <span className="text-gradient">مسارك</span>.
+            </h2>
+          </Reveal>
+        </div>
+
+        <div className="mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          {customPlans.map((plan, i) => (
+            <Reveal key={`${plan.name}-${i}`} delay={i * 0.05}>
+              <div
+                className={`relative flex flex-col justify-between overflow-hidden rounded-3xl p-8 border transition-all duration-300 ${
+                  plan.isFeatured
+                    ? "border-sky-500 bg-slate-900/90 shadow-2xl shadow-sky-500/20 scale-105"
+                    : "border-white/10 bg-card hover:border-white/20"
+                }`}
+              >
+                {plan.isFeatured && (
+                  <span className="absolute top-4 right-4 rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+                    الأكثر طلباً
+                  </span>
+                )}
+                <div>
+                  <h3 className="font-display text-2xl font-bold">{plan.name}</h3>
+                  <div className="mt-6 flex items-baseline gap-2">
+                    <span className="font-display text-4xl font-extrabold">{plan.price}</span>
+                    {plan.originalPrice && (
+                      <span className="text-sm font-semibold text-muted-foreground line-through">
+                        {plan.originalPrice}
+                      </span>
+                    )}
+                  </div>
+                  <ul className="mt-8 space-y-3">
+                    {(Array.isArray(plan.features) ? plan.features : String(plan.features || "").split(",")).map((feat, idx) => (
+                      <li key={idx} className="flex items-center gap-3 text-sm text-white/80">
+                        <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-sky-500/20 text-sky-400">
+                          <Check className="h-3 w-3" />
+                        </div>
+                        {feat}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <a href="#contact" className={`btn-primary mt-10 w-full justify-center ${plan.isFeatured ? "" : "btn-ghost"}`}>
+                  اشترك الآن <ArrowRight className="h-4 w-4" />
+                </a>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ---------- GALLERY ---------- */
 function Gallery() {
-  const images = [g1, g2, g3, g4, g5, g6];
+  const defaultImages = [g1, g2, g3, g4, g5, g6];
+  const customMedia = useLocalStorageData<Array<{ type: string; data: string }>>("landing_media", []);
+  
+  const images = (customMedia && customMedia.length > 0)
+    ? customMedia.filter((m) => m.type.startsWith("image")).map((m) => m.data)
+    : defaultImages;
+
+  const displayImages = images.length > 0 ? images : defaultImages;
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
   return (
@@ -774,11 +952,11 @@ function Gallery() {
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
           <div className="max-w-2xl">
             <Reveal>
-              <span className="eyebrow">Inside Apex</span>
+              <span className="eyebrow">من داخل الأكاديمية</span>
             </Reveal>
             <Reveal delay={0.05}>
               <h2 className="mt-6 font-display text-5xl font-bold leading-[1.02] tracking-tight md:text-6xl">
-                Moments that <span className="text-gradient">move</span> us.
+                لحظات <span className="text-gradient">تلهمنا</span>.
               </h2>
             </Reveal>
           </div>
@@ -862,11 +1040,11 @@ function Coaches() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="max-w-2xl">
           <Reveal>
-            <span className="eyebrow">The Team</span>
+            <span className="eyebrow">الفريق التدريبي</span>
           </Reveal>
           <Reveal delay={0.05}>
             <h2 className="mt-6 font-display text-5xl font-bold leading-[1.02] tracking-tight md:text-6xl">
-              Coaches who've <span className="text-gradient">done it</span>.
+              مدربون <span className="text-gradient">أثبتوا أنفسهم</span>.
             </h2>
           </Reveal>
         </div>
@@ -937,38 +1115,25 @@ function Coaches() {
 
 /* ---------- TESTIMONIALS ---------- */
 function Testimonials() {
-  const items = [
-    {
-      name: "Julia R.",
-      role: "Parent · Swimming",
-      text: "My daughter went from beginner to regional finalist in 18 months. The coaching structure is unreal.",
-      rating: 5,
-    },
-    {
-      name: "Kareem S.",
-      role: "Athlete · Football",
-      text: "Every session has a purpose. You feel the professional environment the moment you walk in.",
-      rating: 5,
-    },
-    {
-      name: "Elena V.",
-      role: "Athlete · Gymnastics",
-      text: "The facilities feel like a national training center. And the coaches actually care.",
-      rating: 5,
-    },
-    {
-      name: "Tom L.",
-      role: "Parent · Karate",
-      text: "Discipline, respect, and real skill. Apex has changed my son's confidence completely.",
-      rating: 5,
-    },
-    {
-      name: "Nora A.",
-      role: "Athlete · Fitness",
-      text: "Best programming I've followed. Small groups, big results.",
-      rating: 5,
-    },
+  const defaultItems = [
+    { name: "جوليا ر.", role: "ولي أمر · سباحة", text: "ابنتي انتقلت من مبتدئة إلى متأهلة إقليمية في 18 شهراً. المنهج التدريبي لا يصدق.", rating: 5, image: "" },
+    { name: "كريم س.", role: "رياضي · كرة قدم", text: "كل تدريب له هدف. تشعر بالاحترافية من لحظة دخولك.", rating: 5, image: "" },
+    { name: "إيلينا ف.", role: "رياضية · جمباز", text: "المرافق تشبه المراكز الوطنية. والمدربون يهتمون فعلاً.", rating: 5, image: "" },
+    { name: "توم ل.", role: "ولي أمر · كاراتيه", text: "انضباط واحترام ومهارة حقيقية. الأكاديمية غيّرت ثقة ابني بشكل كامل.", rating: 5, image: "" },
+    { name: "نورا أ.", role: "رياضية · لياقة", text: "أفضل برنامج تدريبي اتبعته. مجموعات صغيرة ونتائج كبيرة.", rating: 5, image: "" },
   ];
+
+  const customTestimonials = useLocalStorageData<Array<{ name: string; role?: string; text: string; rating?: string | number; image?: string }>>("landing_testimonials", []);
+  
+  const items = (customTestimonials && customTestimonials.length > 0)
+    ? customTestimonials.map((t) => ({
+        name: t.name,
+        role: t.role || "أولياء أمور وأعضاء",
+        text: t.text,
+        rating: Number(t.rating) || 5,
+        image: t.image || "",
+      }))
+    : defaultItems;
 
   const [emblaRef, embla] = useEmblaCarousel({ loop: true, align: "start" });
   useEffect(() => {
@@ -982,12 +1147,12 @@ function Testimonials() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="max-w-2xl">
           <Reveal>
-            <span className="eyebrow">Testimonials</span>
+            <span className="eyebrow">آراء رياضيينا</span>
           </Reveal>
           <Reveal delay={0.05}>
             <h2 className="mt-6 font-display text-5xl font-bold leading-[1.02] tracking-tight md:text-6xl">
-              Real athletes. <br />
-              <span className="text-gradient">Real results.</span>
+              رياضيون حقيقيون. <br />
+              <span className="text-gradient">نتائج حقيقية.</span>
             </h2>
           </Reveal>
         </div>
@@ -996,23 +1161,29 @@ function Testimonials() {
           <div className="flex gap-6">
             {items.map((t, i) => (
               <div key={i} className="min-w-[85%] md:min-w-[46%] lg:min-w-[32%]">
-                <div className="glass h-full rounded-3xl p-8">
-                  <div className="flex gap-1">
-                    {Array.from({ length: t.rating }).map((_, k) => (
-                      <Star
-                        key={k}
-                        className="h-4 w-4 fill-[oklch(0.85_0.15_75)] text-[oklch(0.85_0.15_75)]"
-                      />
-                    ))}
-                  </div>
-                  <p className="mt-6 font-display text-xl leading-snug">"{t.text}"</p>
-                  <div className="mt-8 flex items-center gap-3">
-                    <div
-                      className="grid h-10 w-10 place-items-center rounded-full text-sm font-bold"
-                      style={{ background: "var(--gradient-brand)" }}
-                    >
-                      {t.name[0]}
+                <div className="glass h-full rounded-3xl p-8 flex flex-col justify-between">
+                  <div>
+                    <div className="flex gap-1">
+                      {Array.from({ length: t.rating }).map((_, k) => (
+                        <Star
+                          key={k}
+                          className="h-4 w-4 fill-[oklch(0.85_0.15_75)] text-[oklch(0.85_0.15_75)]"
+                        />
+                      ))}
                     </div>
+                    <p className="mt-6 font-display text-xl leading-snug">"{t.text}"</p>
+                  </div>
+                  <div className="mt-8 flex items-center gap-3">
+                    {t.image ? (
+                      <img src={t.image} alt={t.name} className="h-10 w-10 rounded-full object-cover border border-white/20" />
+                    ) : (
+                      <div
+                        className="grid h-10 w-10 place-items-center rounded-full text-sm font-bold"
+                        style={{ background: "var(--gradient-brand)" }}
+                      >
+                        {t.name[0]}
+                      </div>
+                    )}
                     <div>
                       <p className="text-sm font-semibold">{t.name}</p>
                       <p className="text-xs text-muted-foreground">{t.role}</p>
@@ -1028,28 +1199,88 @@ function Testimonials() {
   );
 }
 
+/* ---------- NEWS SECTION ---------- */
+function NewsSection() {
+  const customNews = useLocalStorageData<Array<{ title: string; category: string; date: string; link: string; image: string }>>("landing_news", []);
+  if (!customNews || customNews.length === 0) return null;
+
+  return (
+    <section id="news" className="section-pad relative">
+      <div className="mx-auto max-w-7xl px-6">
+        <div className="max-w-2xl">
+          <Reveal>
+            <span className="eyebrow">آخر الأخبار</span>
+          </Reveal>
+          <Reveal delay={0.05}>
+            <h2 className="mt-6 font-display text-5xl font-bold leading-[1.02] tracking-tight md:text-6xl">
+              الأخبار & <span className="text-gradient">الإعلانات</span>.
+            </h2>
+          </Reveal>
+        </div>
+
+        <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          {customNews.map((news, i) => (
+            <Reveal key={`${news.title}-${i}`} delay={i * 0.05}>
+              <div className="group relative overflow-hidden rounded-3xl border border-white/10 bg-card transition-all duration-300 hover:border-white/20 hover:-translate-y-1">
+                {news.image && (
+                  <div className="h-48 w-full overflow-hidden">
+                    <img
+                      src={news.image}
+                      alt={news.title}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  </div>
+                )}
+                <div className="p-6">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="rounded-full bg-white/10 px-3 py-1 font-medium text-white/80">
+                      {news.category}
+                    </span>
+                    <span>{news.date}</span>
+                  </div>
+                  <h3 className="mt-4 font-display text-xl font-bold leading-snug">{news.title}</h3>
+                  {news.link && news.link !== "#" && (
+                    <a
+                      href={news.link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-sky-400 hover:underline"
+                    >
+                      اقرأ المقال <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ---------- FAQ ---------- */
 function FAQ() {
   const faqs = [
     {
-      q: "What ages do you accept?",
-      a: "We train athletes from age 4 through adult, with programs structured for every stage — from foundations to elite performance.",
+      q: "ما الأعمار التي تقبلونها؟",
+      a: "ندرّب الرياضيين من سن 4 حتى البالغين، مع برامج مصممة لكل مرحلة — من الأساسيات حتى الأداء الاحترافي.",
     },
     {
-      q: "Do I need experience to start?",
-      a: "No experience required. Every discipline runs beginner, intermediate, and competition tracks with dedicated coaches.",
+      q: "هل أحتاج خبرة مسبقة للانضمام؟",
+      a: "لا حاجة لأي خبرة. كل رياضة تضم مسارات للمبتدئين والمتوسطين والمتنافسين مع مدربين متخصصين.",
     },
     {
-      q: "Can I try a class before enrolling?",
-      a: "Yes. Every new athlete gets a complimentary trial session to meet the coach and experience the facility.",
+      q: "هل يمكنني تجربة حصة قبل الاشتراك؟",
+      a: "بالطبع. كل رياضي جديد يحصل على حصة تجريبية مجانية للتعرف على المدرب والمنشأة.",
     },
     {
-      q: "Do you offer competitive teams?",
-      a: "Absolutely. We field competitive squads in football, swimming, basketball, volleyball, karate, and gymnastics.",
+      q: "هل تتوفر فرق تنافسية؟",
+      a: "نعم. لدينا فرق تنافسية في كرة القدم والسباحة والسلة والطائرة والكاراتيه والجمباز.",
     },
     {
-      q: "What's included in membership?",
-      a: "Structured coaching, program periodization, facility access, progress tracking, and community events.",
+      q: "ما الذي يشمله الاشتراك؟",
+      a: "تدريب منظم وبرنامج دوري ودخول المرافق وتتبع التقدم وفعاليات المجتمع الرياضي.",
     },
   ];
   const [open, setOpen] = useState<number | null>(0);
@@ -1058,11 +1289,11 @@ function FAQ() {
       <div className="mx-auto max-w-4xl px-6">
         <div className="text-center">
           <Reveal>
-            <span className="eyebrow">FAQ</span>
+            <span className="eyebrow">الأسئلة الشائعة</span>
           </Reveal>
           <Reveal delay={0.05}>
             <h2 className="mt-6 font-display text-5xl font-bold leading-[1.02] tracking-tight md:text-6xl">
-              Questions, <span className="text-gradient">answered</span>.
+              أسئلة <span className="text-gradient">وأجوبة</span>.
             </h2>
           </Reveal>
         </div>
@@ -1106,23 +1337,26 @@ function FAQ() {
 /* ---------- CONTACT ---------- */
 function Contact() {
   const [sent, setSent] = useState(false);
+  const generalSettings = useLocalStorageData<{ whatsappNumber?: string }>("system_settings_general", {});
+  const waNum = generalSettings?.whatsappNumber || "15550108842";
+  const cleanWa = waNum.replace(/[^0-9]/g, "");
+
   return (
     <section id="contact" className="section-pad relative">
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <Reveal>
-              <span className="eyebrow">Get in Touch</span>
+              <span className="eyebrow">تواصل معنا</span>
             </Reveal>
             <Reveal delay={0.05}>
               <h2 className="mt-6 font-display text-5xl font-bold leading-[1.02] tracking-tight md:text-6xl">
-                Ready to <span className="text-gradient">train</span>?
+                مستعد للـ <span className="text-gradient">تدريب</span>؟
               </h2>
             </Reveal>
             <Reveal delay={0.1}>
               <p className="mt-6 max-w-md text-muted-foreground">
-                Book a trial session or ask us anything. We reply within a few hours during opening
-                times.
+                احجز حصة تجريبية أو اسألنا أي شيء. نرد خلال ساعات قليلة في أوقات العمل.
               </p>
             </Reveal>
 
@@ -1130,21 +1364,21 @@ function Contact() {
               {[
                 {
                   icon: Phone,
-                  label: "Call us",
-                  val: "+1 (555) 010-8842",
-                  href: "tel:+15550108842",
+                  label: "اتصل بنا",
+                  val: cleanWa ? `+${cleanWa}` : "+1 (555) 010-8842",
+                  href: cleanWa ? `tel:+${cleanWa}` : "tel:+15550108842",
                 },
                 {
                   icon: Mail,
-                  label: "Email",
+                  label: "البريد الإلكتروني",
                   val: "hello@apexacademy.co",
                   href: "mailto:hello@apexacademy.co",
                 },
                 {
                   icon: MessageCircle,
-                  label: "WhatsApp",
-                  val: "Chat with us",
-                  href: "https://wa.me/15550108842",
+                  label: "واتساب",
+                  val: "تحدث معنا",
+                  href: cleanWa ? `https://wa.me/${cleanWa}` : "https://wa.me/15550108842",
                 },
               ].map((r) => (
                 <a
@@ -1189,24 +1423,24 @@ function Contact() {
               }}
               className="glass rounded-3xl p-8 md:p-10"
             >
-              <h3 className="font-display text-2xl font-bold">Send a message</h3>
+              <h3 className="font-display text-2xl font-bold">أرسل رسالة</h3>
               <div className="mt-8 grid gap-5">
-                <Field label="Full name" name="name" />
-                <Field label="Email" name="email" type="email" />
-                <Field label="Phone" name="phone" type="tel" />
+                <Field label="الاسم الكامل" name="name" />
+                <Field label="البريد الإلكتروني" name="email" type="email" />
+                <Field label="رقم الهاتف" name="phone" type="tel" />
                 <div>
                   <label className="mb-2 block text-xs uppercase tracking-widest text-muted-foreground">
-                    Sport of interest
+                    الرياضة المفضلة
                   </label>
                   <select className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-white/30">
                     {[
-                      "Football",
-                      "Swimming",
-                      "Basketball",
-                      "Volleyball",
-                      "Karate",
-                      "Gymnastics",
-                      "Fitness",
+                      "كرة القدم",
+                      "السباحة",
+                      "كرة السلة",
+                      "الكرة الطائرة",
+                      "الكاراتيه",
+                      "الجمباز",
+                      "اللياقة البدنية",
                     ].map((s) => (
                       <option key={s}>{s}</option>
                     ))}
@@ -1214,7 +1448,7 @@ function Contact() {
                 </div>
                 <div>
                   <label className="mb-2 block text-xs uppercase tracking-widest text-muted-foreground">
-                    Message
+                    رسالتك
                   </label>
                   <textarea
                     rows={4}
@@ -1222,7 +1456,7 @@ function Contact() {
                   />
                 </div>
                 <button type="submit" className="btn-primary mt-2 w-full justify-center">
-                  {sent ? "Message sent ✓" : "Send message"}{" "}
+                  {sent ? "تم إرسال الرسالة ✓" : "إرسال الرسالة"}{" "}
                   {!sent && <ArrowRight className="h-4 w-4" />}
                 </button>
               </div>
@@ -1255,22 +1489,25 @@ function Field({ label, name, type = "text" }: { label: string; name: string; ty
 
 /* ---------- FOOTER ---------- */
 function Footer() {
+  const generalSettings = useLocalStorageData<{ academyName?: string }>("system_settings_general", {});
+  const brandName = generalSettings?.academyName || "APEX";
+
   return (
     <footer className="relative border-t border-white/5 bg-black/40 py-16">
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
-            <a href="#top" className="flex items-center gap-2 font-display text-xl font-bold">
+            <a href="#top" className="flex items-center gap-2 font-display text-xl font-bold uppercase">
               <span
                 className="grid h-9 w-9 place-items-center rounded-xl"
                 style={{ background: "var(--gradient-brand)" }}
               >
                 <Trophy className="h-4 w-4 text-white" />
               </span>
-              APEX<span className="text-gradient">.</span>
+              {brandName}<span className="text-gradient">.</span>
             </a>
             <p className="mt-4 max-w-xs text-sm text-muted-foreground">
-              A multi-sports academy built for athletes who want more from the process.
+              أكاديمية رياضية متعددة التخصصات، صُمّمت للرياضيين الذين يريدون أكثر.
             </p>
             <div className="mt-6 flex gap-3">
               {[Instagram, Twitter, Facebook, Youtube].map((I, i) => (
@@ -1287,19 +1524,19 @@ function Footer() {
           </div>
           {[
             {
-              t: "Sports",
+              t: "الرياضات",
               l: [
-                "Football",
-                "Swimming",
-                "Basketball",
-                "Volleyball",
-                "Karate",
-                "Gymnastics",
-                "Fitness",
+                "كرة القدم",
+                "السباحة",
+                "كرة السلة",
+                "الكرة الطائرة",
+                "الكاراتيه",
+                "الجمباز",
+                "اللياقة البدنية",
               ],
             },
-            { t: "Company", l: ["About", "Coaches", "Branches", "Careers", "Press"] },
-            { t: "Support", l: ["Contact", "FAQ", "Membership", "Trial Class", "Terms"] },
+            { t: "الأكاديمية", l: ["من نحن", "المدربون", "الفروع", "Careers", "الأخبار"] },
+            { t: "الدعم", l: ["تواصل معنا", "الأسئلة الشائعة", "العضوية", "حصة تجريبية", "الشروط"] },
           ].map((col) => (
             <div key={col.t}>
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground">
@@ -1314,7 +1551,7 @@ function Footer() {
                           to="/join-as-coach"
                           className="text-sm text-white/80 hover:text-white"
                         >
-                          Join as Coach
+                          انضم كمدرب
                         </Link>
                       </li>
                     );
@@ -1333,9 +1570,9 @@ function Footer() {
         </div>
         <div className="mt-16 flex flex-col items-start justify-between gap-4 border-t border-white/5 pt-8 md:flex-row md:items-center">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} Apex Sports Academy. All rights reserved.
+            © {new Date().getFullYear()} {brandName} للأكاديمية الرياضية. جميع الحقوق محفوظة.
           </p>
-          <p className="text-xs text-muted-foreground">Made for athletes.</p>
+          <p className="text-xs text-muted-foreground">صُنع للرياضيين.</p>
         </div>
       </div>
     </footer>
@@ -1344,9 +1581,13 @@ function Footer() {
 
 /* ---------- Floating WhatsApp ---------- */
 function FloatingWhatsApp() {
+  const generalSettings = useLocalStorageData<{ whatsappNumber?: string }>("system_settings_general", {});
+  const waNum = generalSettings?.whatsappNumber || "15550108842";
+  const cleanWa = waNum.replace(/[^0-9]/g, "");
+
   return (
     <a
-      href="https://wa.me/15550108842"
+      href={cleanWa ? `https://wa.me/${cleanWa}` : "https://wa.me/15550108842"}
       target="_blank"
       rel="noreferrer"
       aria-label="WhatsApp"
