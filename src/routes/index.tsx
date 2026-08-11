@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, lazy, Suspense } from "react";
-import { motion, useScroll, useTransform, AnimatePresence, useInView } from "framer-motion";
+import { motion, useScroll, useTransform, AnimatePresence, useInView, useSpring } from "framer-motion";
 import {
   Menu,
   X,
@@ -188,10 +188,21 @@ function LandingPage() {
   const isMobile = useIsMobile();
   return (
     <div dir="rtl" className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
+      <ScrollProgress />
       <Navbar />
       <Hero isMobile={isMobile} />
+      <CinematicStatement
+        phrase="مكان يصنع الأبطال"
+        accentWord="الأبطال"
+        sub="منذ 2009 — هنا تبدأ الرحلة"
+      />
       <About isMobile={isMobile} />
       <Sports isMobile={isMobile} />
+      <CinematicStatement
+        phrase="هنا تبدأ القصة"
+        accentWord="القصة"
+        sub="كل بطل بدأ بخطوة واحدة — وهذه هي خطوتك"
+      />
       <Branches />
       <Pricing />
       <Gallery />
@@ -235,9 +246,10 @@ function Navbar() {
       <header
         className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${
           scrolled
-            ? "py-3 backdrop-blur-xl bg-background/70 border-b border-white/5"
+            ? "py-3 backdrop-blur-xl border-b border-white/10"
             : "py-6 bg-transparent"
         }`}
+        style={scrolled ? { background: "rgba(26, 31, 62, 0.82)" } : undefined}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6">
           <a
@@ -245,7 +257,7 @@ function Navbar() {
             className="flex items-center gap-2 font-display text-lg font-bold tracking-tight uppercase"
           >
             <span
-              className="grid h-9 w-9 place-items-center rounded-xl"
+              className="grid h-9 w-9 place-items-center rounded-xl animate-glow-pulse"
               style={{ background: "var(--gradient-brand)" }}
             >
               <Trophy className="h-4 w-4 text-white" strokeWidth={2.5} />
@@ -257,7 +269,7 @@ function Navbar() {
               <a
                 key={href}
                 href={href}
-                className="text-sm font-medium text-white/80 transition-colors hover:text-white"
+                className="text-sm font-medium text-white/75 transition-all duration-200 hover:text-white hover:text-[var(--orange-light)]"
               >
                 {label}
               </a>
@@ -274,7 +286,7 @@ function Navbar() {
           <button
             aria-label="فتح القائمة"
             onClick={() => setOpen(true)}
-            className="grid h-11 w-11 place-items-center rounded-full border border-white/15 md:hidden"
+            className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-white/5 backdrop-blur-md md:hidden"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -283,33 +295,38 @@ function Navbar() {
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-background/95 backdrop-blur-2xl md:hidden"
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 40 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed inset-0 z-[60] backdrop-blur-2xl md:hidden"
+            style={{ background: "rgba(17, 24, 40, 0.97)" }}
           >
-            <div className="flex items-center justify-between p-6">
+            <div className="flex items-center justify-between p-6 border-b border-white/8">
               <span className="font-display text-lg font-bold">
                 {brandName}<span className="text-gradient">.</span>
               </span>
               <button
                 aria-label="إغلاق"
                 onClick={() => setOpen(false)}
-                className="grid h-11 w-11 place-items-center rounded-full border border-white/15"
+                className="grid h-11 w-11 place-items-center rounded-full border border-white/15 bg-white/5"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <nav className="flex flex-col gap-2 px-6 pt-8">
-              {links.map(([label, href]) => (
-                <a
+            <nav className="flex flex-col gap-1 px-6 pt-8">
+              {links.map(([label, href], idx) => (
+                <motion.a
                   key={href}
                   href={href}
                   onClick={() => setOpen(false)}
-                  className="border-b border-white/5 py-5 font-display text-3xl"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.05 + 0.1 }}
+                  className="border-b border-white/6 py-5 font-display text-3xl transition-colors hover:text-[var(--orange-light)]"
                 >
                   {label}
-                </a>
+                </motion.a>
               ))}
               <Link
                 to="/join-as-coach"
@@ -434,6 +451,18 @@ function Hero({ isMobile }: { isMobile: boolean }) {
         </div>
       </motion.div>
 
+      {/* Cinematic orange line draws across on hero load */}
+      <motion.div
+        initial={{ scaleX: 0, opacity: 0 }}
+        animate={{ scaleX: 1, opacity: 1 }}
+        transition={{ delay: 1.1, duration: 1.8, ease: [0.22, 1, 0.36, 1] }}
+        className="absolute bottom-0 left-0 right-0 h-px z-10"
+        style={{
+          background: "linear-gradient(90deg, transparent 0%, rgba(255,100,43,0.5) 25%, rgba(255,100,43,0.5) 75%, transparent 100%)",
+          transformOrigin: "left",
+        }}
+      />
+
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -455,20 +484,20 @@ function Hero({ isMobile }: { isMobile: boolean }) {
 function Reveal({
   children,
   delay = 0,
-  y = 40,
+  y = 32,
 }: {
   children: React.ReactNode;
   delay?: number;
   y?: number;
 }) {
   const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-80px" });
+  const inView = useInView(ref, { once: true, margin: "-60px" });
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, y, filter: "blur(6px)" }}
+      animate={inView ? { opacity: 1, y: 0, filter: "blur(0px)" } : {}}
+      transition={{ duration: 0.75, delay, ease: [0.22, 1, 0.36, 1] }}
     >
       {children}
     </motion.div>
@@ -503,6 +532,170 @@ function Counter({ end, suffix = "" }: { end: number; suffix?: string }) {
   );
 }
 
+/* ---------- Scroll Progress Bar ---------- */
+function ScrollProgress() {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30, restDelta: 0.001 });
+  return (
+    <motion.div
+      className="fixed top-0 left-0 right-0 z-[200] h-[3px] origin-left"
+      style={{
+        scaleX,
+        background: "var(--gradient-brand)",
+      }}
+    />
+  );
+}
+
+/* ---------- Cinematic Statement Chapter Break ---------- */
+function CinematicStatement({
+  phrase,
+  accentWord,
+  sub,
+  light = false,
+}: {
+  phrase: string;
+  accentWord?: string;
+  sub?: string;
+  light?: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-20%" });
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "18%"]);
+  const contentOpacity = useTransform(scrollYProgress, [0, 0.12, 0.88, 1], [0, 1, 1, 0]);
+  const words = phrase.split(" ");
+
+  return (
+    <section
+      ref={ref}
+      className="relative flex h-screen items-center justify-center overflow-hidden"
+      style={{ background: light ? "#f4f5fb" : "var(--navy-deepest)" }}
+    >
+      {/* Ambient orb */}
+      <motion.div style={{ y: bgY }} className="absolute inset-0 pointer-events-none">
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[70vw] w-[70vw] rounded-full"
+          style={{
+            background: light
+              ? "radial-gradient(circle, rgba(255,100,43,0.08) 0%, transparent 70%)"
+              : "radial-gradient(circle, rgba(255,100,43,0.22) 0%, transparent 70%)",
+            filter: "blur(90px)",
+          }}
+        />
+      </motion.div>
+
+      {/* Subtle grid texture */}
+      <div
+        className="absolute inset-0 pointer-events-none cinematic-grid"
+        style={{ opacity: light ? 0.6 : 1 }}
+      />
+
+      <motion.div style={{ opacity: contentOpacity }} className="relative z-10 px-6 text-center max-w-6xl mx-auto">
+        {/* Chapter eyebrow */}
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+          className="mb-10"
+        >
+          <span className={light ? "eyebrow-dark" : "eyebrow"}>فصل جديد</span>
+        </motion.div>
+
+        {/* Word-by-word reveal */}
+        <div className="flex flex-wrap justify-center gap-x-5 gap-y-1">
+          {words.map((word, i) => (
+            <div key={i} className="overflow-hidden pb-3">
+              <motion.span
+                initial={{ y: "110%", opacity: 0 }}
+                animate={inView ? { y: 0, opacity: 1 } : {}}
+                transition={{
+                  duration: 1.0,
+                  delay: 0.25 + i * 0.12,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+                className={`block font-display font-bold tracking-tight leading-[0.92] text-[11vw] md:text-[7vw] lg:text-[5.5vw] ${
+                  accentWord === word ? "text-gradient" : ""
+                }`}
+                style={{
+                  color:
+                    accentWord === word
+                      ? undefined
+                      : light
+                      ? "var(--navy-deep)"
+                      : "white",
+                }}
+              >
+                {word}
+              </motion.span>
+            </div>
+          ))}
+        </div>
+
+        {/* Orange accent line */}
+        <div className="flex justify-center mt-8">
+          <motion.div
+            initial={{ scaleX: 0 }}
+            animate={inView ? { scaleX: 1 } : {}}
+            transition={{
+              duration: 1.1,
+              delay: 0.25 + words.length * 0.12 + 0.1,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="h-[3px] w-28 rounded-full"
+            style={{ transformOrigin: "center", background: "var(--gradient-brand)" }}
+          />
+        </div>
+
+        {/* Sub text */}
+        {sub && (
+          <motion.p
+            initial={{ opacity: 0, y: 18 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{
+              duration: 0.8,
+              delay: 0.25 + words.length * 0.12 + 0.45,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="mt-8 text-lg font-light tracking-wide"
+            style={{ color: light ? "rgba(46,51,97,0.55)" : "rgba(255,255,255,0.5)" }}
+          >
+            {sub}
+          </motion.p>
+        )}
+      </motion.div>
+    </section>
+  );
+}
+
+/* ---------- Wave Section Divider ---------- */
+function WaveDivider({
+  fromColor = "var(--navy-deep)",
+  toColor = "var(--navy-mid)",
+  flipY = false,
+}: {
+  fromColor?: string;
+  toColor?: string;
+  flipY?: boolean;
+}) {
+  return (
+    <div className="relative overflow-hidden leading-[0]" style={{ background: toColor }}>
+      <svg
+        viewBox="0 0 1440 72"
+        preserveAspectRatio="none"
+        className="block w-full"
+        style={{ height: "72px", transform: flipY ? "scaleY(-1)" : undefined }}
+        aria-hidden="true"
+      >
+        <path
+          d="M0,36 C360,72 720,0 1080,36 C1260,54 1380,36 1440,36 L1440,0 L0,0 Z"
+          fill={fromColor}
+        />
+      </svg>
+    </div>
+  );
+}
+
 /* ---------- ABOUT ---------- */
 function About({ isMobile }: { isMobile: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -527,48 +720,56 @@ function About({ isMobile }: { isMobile: boolean }) {
   const displayAboutImg = ceoPhoto || aboutImg;
 
   return (
-    <section id="about" ref={ref} className="section-pad relative">
+    <section id="about" ref={ref} className="section-pad relative" style={{ background: "var(--navy-deep)" }}>
       <div
         className="absolute inset-0 -z-10"
         style={{
           background:
-            "radial-gradient(ellipse at 20% 0%, oklch(0.75 0.2 55 / 0.08), transparent 50%)",
+            "radial-gradient(ellipse at 20% 0%, rgba(255, 100, 43, 0.09), transparent 55%)",
         }}
       />
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid gap-16 lg:grid-cols-[1fr_1.1fr] lg:gap-24">
           <div className="relative">
-            <div
-              className="sticky top-32 overflow-hidden rounded-3xl"
-              style={{ boxShadow: "var(--shadow-card)" }}
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.96 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: true, margin: "-10%" }}
+              transition={{ duration: 1.3, ease: [0.22, 1, 0.36, 1] }}
             >
-              <motion.img
-                src={displayAboutImg}
-                alt="Inside Academy"
-                loading="lazy"
-                width={1600}
-                height={1200}
-                style={isMobile ? undefined : { y: imgY, scale: 1.15 }}
-                className="h-[560px] w-full object-cover md:h-[680px]"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
-              <div className="absolute bottom-6 left-6 right-6 glass-strong rounded-2xl p-5">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="grid h-11 w-11 place-items-center rounded-xl"
-                    style={{ background: "var(--gradient-brand)" }}
-                  >
-                    <Award className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-widest text-white/60">
-                      تميز معتمد
-                    </p>
-                    <p className="text-sm font-semibold">معتمد من FIFA · FINA · FIBA</p>
+              <div
+                className="sticky top-32 overflow-hidden rounded-3xl"
+                style={{ boxShadow: "0 24px 80px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,100,43,0.12)" }}
+              >
+                {/* Clip-path reveal overlay that sweeps away on load */}
+                <motion.img
+                  src={displayAboutImg}
+                  alt="Inside Academy"
+                  loading="lazy"
+                  width={1600}
+                  height={1200}
+                  style={isMobile ? undefined : { y: imgY, scale: 1.15 }}
+                  className="h-[560px] w-full object-cover md:h-[680px]"
+                />
+                <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(17,24,40,0.7) 0%, transparent 60%)" }} />
+                <div className="absolute bottom-6 left-6 right-6 glass-strong rounded-2xl p-5">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="grid h-11 w-11 place-items-center rounded-xl animate-glow-pulse"
+                      style={{ background: "var(--gradient-brand)" }}
+                    >
+                      <Award className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-white/60">
+                        تميز معتمد
+                      </p>
+                      <p className="text-sm font-semibold">معتمد من FIFA · FINA · FIBA</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
 
           <div>
@@ -590,8 +791,17 @@ function About({ isMobile }: { isMobile: boolean }) {
             <div className="mt-14 grid grid-cols-2 gap-6 md:grid-cols-4">
               {stats.map((s, i) => (
                 <Reveal key={s.label} delay={0.05 * i}>
-                  <div className="glass rounded-2xl p-5">
-                    <div className="font-display text-4xl font-bold tracking-tight md:text-5xl">
+                  <div
+                    className="rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1"
+                    style={{
+                      background: "rgba(46, 51, 97, 0.5)",
+                      border: "1px solid rgba(255, 100, 43, 0.18)",
+                      boxShadow: "0 4px 24px -8px rgba(0,0,0,0.4)",
+                    }}
+                  >
+                    <div
+                      className="font-display text-4xl font-bold tracking-tight md:text-5xl text-gradient"
+                    >
                       <Counter end={s.n} suffix={s.s} />
                     </div>
                     <p className="mt-2 text-xs uppercase tracking-widest text-muted-foreground">
@@ -606,15 +816,15 @@ function About({ isMobile }: { isMobile: boolean }) {
               <h3 className="font-display text-sm uppercase tracking-[0.3em] text-muted-foreground">
                 مسيرتنا
               </h3>
-              <ol className="mt-6 relative border-l border-white/10 pl-8">
+              <ol className="mt-6 relative border-l-2 pl-8" style={{ borderColor: "rgba(255, 100, 43, 0.25)" }}>
                 {timeline.map((t, i) => (
                   <Reveal key={t.year} delay={0.05 * i}>
                     <li className="relative pb-10 last:pb-0">
                       <span
-                        className="absolute -left-[41px] top-1 grid h-5 w-5 place-items-center rounded-full"
-                        style={{ background: "var(--gradient-brand)" }}
+                        className="absolute -left-[42px] top-1 grid h-6 w-6 place-items-center rounded-full"
+                        style={{ background: "var(--gradient-brand)", boxShadow: "0 0 12px rgba(255,100,43,0.5)" }}
                       >
-                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                        <span className="h-2 w-2 rounded-full bg-white" />
                       </span>
                       <p className="font-display text-2xl font-bold text-gradient">{t.year}</p>
                       <p className="mt-1 text-muted-foreground">{t.text}</p>
@@ -626,17 +836,31 @@ function About({ isMobile }: { isMobile: boolean }) {
 
             <div className="mt-14 grid gap-6 md:grid-cols-2">
               <Reveal>
-                <div className="glass rounded-2xl p-6">
+                <div
+                  className="rounded-2xl p-6 h-full transition-all duration-300 hover:-translate-y-1"
+                  style={{
+                    background: "rgba(46, 51, 97, 0.45)",
+                    border: "1px solid rgba(255, 100, 43, 0.2)",
+                    borderRight: "3px solid var(--orange)",
+                  }}
+                >
                   <p className="text-xs uppercase tracking-widest text-gradient">رسالتنا</p>
-                  <p className="mt-3 text-base leading-relaxed">
+                  <p className="mt-3 text-base leading-relaxed text-white/80">
                     تمكين كل رياضي من خلال التدريب الاحترافي والمرافق المتطورة والمجتمع الداعم للوصول إلى أعلى مستوياته.
                   </p>
                 </div>
               </Reveal>
               <Reveal delay={0.1}>
-                <div className="glass rounded-2xl p-6">
+                <div
+                  className="rounded-2xl p-6 h-full transition-all duration-300 hover:-translate-y-1"
+                  style={{
+                    background: "rgba(46, 51, 97, 0.45)",
+                    border: "1px solid rgba(255, 100, 43, 0.2)",
+                    borderRight: "3px solid var(--orange)",
+                  }}
+                >
                   <p className="text-xs uppercase tracking-widest text-gradient">رؤيتنا</p>
-                  <p className="mt-3 text-base leading-relaxed">
+                  <p className="mt-3 text-base leading-relaxed text-white/80">
                     أن نكون الأكاديمية الرياضية المتعددة الأكثر احتراماً في المنطقة — اسم مرادف للانضباط والنتائج.
                   </p>
                 </div>
@@ -676,7 +900,14 @@ function Sports({ isMobile }: { isMobile: boolean }) {
   const titleLine2 = titleParts[1] ?? "معيار واحد.";
 
   return (
-    <section id="sports" className="section-pad relative">
+    <section id="sports" className="section-pad relative" style={{ background: "var(--navy-mid)" }}>
+      <div
+        className="absolute inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(ellipse at 80% 100%, rgba(255, 100, 43, 0.07), transparent 50%)",
+        }}
+      />
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
           <div className="max-w-2xl">
@@ -741,9 +972,12 @@ function SportCard({
         onMouseLeave={reset}
         style={{
           transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
-          transition: "transform 0.15s ease-out",
+          transition: "transform 0.15s ease-out, box-shadow 0.45s ease",
         }}
         className="group relative aspect-[4/5] overflow-hidden rounded-3xl bg-card"
+        whileHover={{
+          boxShadow: "0 0 0 2px rgba(255, 100, 43, 0.45), 0 20px 48px -12px rgba(255, 100, 43, 0.22)",
+        }}
       >
         <img
           src={sport.img}
@@ -753,11 +987,11 @@ function SportCard({
           height={1400}
           className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/5" />
         <div
           className="absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
           style={{
-            background: "linear-gradient(135deg, oklch(0.75 0.2 55 / 0.25), transparent 60%)",
+            background: "linear-gradient(135deg, rgba(255, 100, 43, 0.28), transparent 65%)",
           }}
         />
 
@@ -804,14 +1038,21 @@ function Branches() {
     : defaultBranches;
 
   return (
-    <section id="branches" className="section-pad relative">
+    <section id="branches" className="section-pad relative" style={{ background: "#f4f5fb" }}>
+      <div
+        className="absolute inset-0 -z-10"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 15% 85%, rgba(46,51,97,0.07) 0%, transparent 50%), radial-gradient(circle at 85% 15%, rgba(255,100,43,0.06) 0%, transparent 50%)",
+        }}
+      />
       <div className="mx-auto max-w-7xl px-6">
         <div className="max-w-2xl">
           <Reveal>
-            <span className="eyebrow">المواقع</span>
+            <span className="eyebrow-dark">المواقع</span>
           </Reveal>
           <Reveal delay={0.05}>
-            <h2 className="mt-6 font-display text-5xl font-bold leading-[1.02] tracking-tight md:text-6xl">
+            <h2 className="mt-6 font-display text-5xl font-bold leading-[1.02] tracking-tight md:text-6xl" style={{ color: "var(--navy-deep)" }}>
               {branches.length} فروع. <br />
               <span className="text-gradient">عائلة واحدة.</span>
             </h2>
@@ -822,38 +1063,55 @@ function Branches() {
           {branches.map((b, i) => (
             <Reveal key={`${b.name}-${i}`} delay={i * 0.05}>
               <div
-                className="group relative overflow-hidden rounded-3xl border border-white/5 bg-card p-8 transition-all duration-500 hover:border-white/15 hover:-translate-y-2 flex flex-col justify-between"
-                style={{ boxShadow: "var(--shadow-soft)" }}
+                className="group relative overflow-hidden rounded-3xl p-8 transition-all duration-500 hover:-translate-y-2 flex flex-col justify-between"
+                style={{
+                  background: "white",
+                  border: "1px solid rgba(46, 51, 97, 0.12)",
+                  boxShadow: "0 4px 24px -8px rgba(46, 51, 97, 0.15)",
+                }}
               >
                 {b.image && (
-                  <div className="absolute inset-0 -z-10 opacity-30 group-hover:opacity-40 transition-opacity">
+                  <div className="absolute inset-0 -z-10 opacity-15 group-hover:opacity-25 transition-opacity">
                     <img src={b.image} alt={b.name} className="h-full w-full object-cover" />
                   </div>
                 )}
                 <div
-                  className="absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                  className="absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100 pointer-events-none"
                   style={{
                     background:
-                      "radial-gradient(ellipse at top right, oklch(0.75 0.2 55 / 0.12), transparent 60%)",
+                      "radial-gradient(ellipse at top right, rgba(255, 100, 43, 0.07), transparent 60%)",
                   }}
+                />
+                <div
+                  className="absolute bottom-0 left-0 h-1 w-0 group-hover:w-full transition-all duration-500 rounded-b-3xl"
+                  style={{ background: "var(--gradient-brand)" }}
                 />
                 <div className="relative">
                   <div className="flex items-start justify-between">
-                    <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/5">
-                      <MapPin className="h-5 w-5" />
+                    <div
+                      className="grid h-12 w-12 place-items-center rounded-2xl"
+                      style={{ background: "rgba(46, 51, 97, 0.08)" }}
+                    >
+                      <MapPin className="h-5 w-5" style={{ color: "var(--navy-mid)" }} />
                     </div>
-                    <span className="rounded-full border border-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    <span
+                      className="rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-widest"
+                      style={{ background: "rgba(255, 100, 43, 0.1)", color: "var(--orange)", border: "1px solid rgba(255, 100, 43, 0.25)" }}
+                    >
                       {b.sports}
                     </span>
                   </div>
-                  <h3 className="mt-8 font-display text-2xl font-bold">{b.name}</h3>
+                  <h3 className="mt-8 font-display text-2xl font-bold" style={{ color: "var(--navy-deep)" }}>{b.name}</h3>
                   <p className="mt-1 text-sm text-gradient font-semibold">{b.city}</p>
-                  <p className="mt-4 text-sm text-muted-foreground">{b.addr}</p>
+                  <p className="mt-4 text-sm" style={{ color: "rgba(46, 51, 97, 0.6)" }}>{b.addr}</p>
                   <a
                     href={b.map}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-white transition-colors group-hover:text-[oklch(0.85_0.13_60)]"
+                    className="mt-8 inline-flex items-center gap-2 text-sm font-semibold transition-colors"
+                    style={{ color: "var(--navy-mid)" }}
+                    onMouseEnter={e => (e.currentTarget.style.color = "var(--orange)")}
+                    onMouseLeave={e => (e.currentTarget.style.color = "var(--navy-mid)")}
                   >
                     افتح في الخرائط <ArrowUpRight className="h-4 w-4" />
                   </a>
@@ -873,7 +1131,14 @@ function Pricing() {
   if (!customPlans || customPlans.length === 0) return null;
 
   return (
-    <section id="pricing" className="section-pad relative">
+    <section id="pricing" className="section-pad relative" style={{ background: "var(--navy-deepest)" }}>
+      <div
+        className="absolute inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(ellipse at 50% 0%, rgba(255, 100, 43, 0.1), transparent 55%)",
+        }}
+      />
       <div className="mx-auto max-w-7xl px-6">
         <div className="max-w-2xl">
           <Reveal>
@@ -890,21 +1155,32 @@ function Pricing() {
           {customPlans.map((plan, i) => (
             <Reveal key={`${plan.name}-${i}`} delay={i * 0.05}>
               <div
-                className={`relative flex flex-col justify-between overflow-hidden rounded-3xl p-8 border transition-all duration-300 ${
+                className={`relative flex flex-col justify-between overflow-hidden rounded-3xl p-8 transition-all duration-300 ${
                   plan.isFeatured
-                    ? "border-sky-500 bg-slate-900/90 shadow-2xl shadow-sky-500/20 scale-105"
-                    : "border-white/10 bg-card hover:border-white/20"
+                    ? "scale-[1.03]"
+                    : "hover:-translate-y-1"
                 }`}
+                style={plan.isFeatured ? {
+                  background: "linear-gradient(145deg, var(--navy-mid), var(--navy-deep))",
+                  border: "1.5px solid rgba(255, 100, 43, 0.6)",
+                  boxShadow: "0 24px 64px -16px rgba(255, 100, 43, 0.35), 0 0 0 1px rgba(255,100,43,0.2)",
+                } : {
+                  background: "rgba(46, 51, 97, 0.4)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
               >
                 {plan.isFeatured && (
-                  <span className="absolute top-4 right-4 rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+                  <span
+                    className="absolute top-4 right-4 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white"
+                    style={{ background: "var(--gradient-brand)" }}
+                  >
                     الأكثر طلباً
                   </span>
                 )}
                 <div>
                   <h3 className="font-display text-2xl font-bold">{plan.name}</h3>
                   <div className="mt-6 flex items-baseline gap-2">
-                    <span className="font-display text-4xl font-extrabold">{plan.price}</span>
+                    <span className="font-display text-4xl font-extrabold text-gradient">{plan.price}</span>
                     {plan.originalPrice && (
                       <span className="text-sm font-semibold text-muted-foreground line-through">
                         {plan.originalPrice}
@@ -914,7 +1190,10 @@ function Pricing() {
                   <ul className="mt-8 space-y-3">
                     {(Array.isArray(plan.features) ? plan.features : String(plan.features || "").split(",")).map((feat, idx) => (
                       <li key={idx} className="flex items-center gap-3 text-sm text-white/80">
-                        <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-sky-500/20 text-sky-400">
+                        <div
+                          className="grid h-5 w-5 shrink-0 place-items-center rounded-full"
+                          style={{ background: "rgba(255, 100, 43, 0.2)", color: "var(--orange-light)" }}
+                        >
                           <Check className="h-3 w-3" />
                         </div>
                         {feat}
@@ -947,7 +1226,13 @@ function Gallery() {
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
   return (
-    <section id="gallery" className="section-pad relative">
+    <section id="gallery" className="section-pad relative" style={{ background: "var(--navy-deepest)" }}>
+      <div
+        className="absolute inset-0 -z-10"
+        style={{
+          background: "radial-gradient(ellipse at 50% 100%, rgba(255, 100, 43, 0.07), transparent 55%)",
+        }}
+      />
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
           <div className="max-w-2xl">
@@ -964,19 +1249,39 @@ function Gallery() {
 
         <div className="mt-16 columns-2 gap-4 md:columns-3 md:gap-6">
           {images.map((src, i) => (
-            <Reveal key={i} delay={(i % 3) * 0.05}>
+            <motion.div
+              key={i}
+              className="mb-4 md:mb-6"
+              initial={{ clipPath: "inset(100% 0 0 0)", opacity: 0.5 }}
+              whileInView={{ clipPath: "inset(0% 0 0 0)", opacity: 1 }}
+              viewport={{ once: true, margin: "-5%" }}
+              transition={{
+                duration: 0.95,
+                delay: (i % 3) * 0.1,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+            >
               <button
                 onClick={() => setOpenIdx(i)}
-                className="mb-4 block w-full overflow-hidden rounded-2xl md:mb-6"
+                className="block w-full overflow-hidden rounded-2xl"
               >
-                <img
+                <motion.img
                   src={src}
                   alt={`Gallery ${i + 1}`}
                   loading="lazy"
-                  className="h-auto w-full transition-transform duration-700 hover:scale-105"
+                  className="h-auto w-full"
+                  initial={{ scale: 1.12 }}
+                  whileInView={{ scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{
+                    duration: 1.3,
+                    delay: (i % 3) * 0.1,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                  whileHover={{ scale: 1.05, transition: { duration: 0.6 } }}
                 />
               </button>
-            </Reveal>
+            </motion.div>
           ))}
         </div>
       </div>
@@ -1029,12 +1334,12 @@ function Coaches() {
   ];
 
   return (
-    <section id="coaches" className="section-pad relative">
+    <section id="coaches" className="section-pad relative" style={{ background: "var(--navy-mid)" }}>
       <div
         className="absolute inset-0 -z-10"
         style={{
           background:
-            "radial-gradient(ellipse at 80% 20%, oklch(0.75 0.2 55 / 0.08), transparent 50%)",
+            "radial-gradient(ellipse at 80% 20%, rgba(255, 100, 43, 0.08), transparent 55%)",
         }}
       />
       <div className="mx-auto max-w-7xl px-6">
@@ -1063,7 +1368,7 @@ function Coaches() {
                     className="h-full w-full object-cover grayscale transition-all duration-700 group-hover:grayscale-0 group-hover:scale-105"
                   />
                 </div>
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-6">
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#111828] via-[rgba(17,24,40,0.8)] to-transparent p-6">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-gradient">
                     {c.role}
                   </p>
@@ -1072,7 +1377,8 @@ function Coaches() {
                     {c.certs.map((k) => (
                       <span
                         key={k}
-                        className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-medium text-white/70"
+                        className="rounded-full px-2.5 py-1 text-[10px] font-medium"
+                        style={{ background: "rgba(255, 100, 43, 0.15)", border: "1px solid rgba(255, 100, 43, 0.3)", color: "var(--orange-light)" }}
                       >
                         {k}
                       </span>
@@ -1082,14 +1388,20 @@ function Coaches() {
                     <a
                       aria-label="Instagram"
                       href="#"
-                      className="grid h-8 w-8 place-items-center rounded-full bg-white/10 transition-colors hover:bg-white hover:text-black"
+                      className="grid h-8 w-8 place-items-center rounded-full transition-all duration-200"
+                      style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.1)" }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "var(--orange)")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
                     >
                       <Instagram className="h-3.5 w-3.5" />
                     </a>
                     <a
                       aria-label="Twitter"
                       href="#"
-                      className="grid h-8 w-8 place-items-center rounded-full bg-white/10 transition-colors hover:bg-white hover:text-black"
+                      className="grid h-8 w-8 place-items-center rounded-full transition-all duration-200"
+                      style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.1)" }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "var(--orange)")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
                     >
                       <Twitter className="h-3.5 w-3.5" />
                     </a>
@@ -1097,7 +1409,10 @@ function Coaches() {
                       <a
                         aria-label="YouTube"
                         href="#"
-                        className="grid h-8 w-8 place-items-center rounded-full bg-white/10 transition-colors hover:bg-white hover:text-black"
+                        className="grid h-8 w-8 place-items-center rounded-full transition-all duration-200"
+                        style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.1)" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "var(--orange)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
                       >
                         <Youtube className="h-3.5 w-3.5" />
                       </a>
@@ -1143,7 +1458,14 @@ function Testimonials() {
   }, [embla]);
 
   return (
-    <section className="section-pad relative overflow-hidden">
+    <section className="section-pad relative overflow-hidden" style={{ background: "var(--navy-deep)" }}>
+      <div
+        className="absolute inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(ellipse at 20% 50%, rgba(255, 100, 43, 0.07), transparent 60%)",
+        }}
+      />
       <div className="mx-auto max-w-7xl px-6">
         <div className="max-w-2xl">
           <Reveal>
@@ -1161,17 +1483,25 @@ function Testimonials() {
           <div className="flex gap-6">
             {items.map((t, i) => (
               <div key={i} className="min-w-[85%] md:min-w-[46%] lg:min-w-[32%]">
-                <div className="glass h-full rounded-3xl p-8 flex flex-col justify-between">
+                <div
+                  className="h-full rounded-3xl p-8 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1"
+                  style={{
+                    background: "rgba(46, 51, 97, 0.45)",
+                    border: "1px solid rgba(255, 100, 43, 0.15)",
+                    backdropFilter: "blur(20px)",
+                  }}
+                >
                   <div>
                     <div className="flex gap-1">
                       {Array.from({ length: t.rating }).map((_, k) => (
                         <Star
                           key={k}
-                          className="h-4 w-4 fill-[oklch(0.85_0.15_75)] text-[oklch(0.85_0.15_75)]"
+                          className="h-4 w-4"
+                          style={{ fill: "var(--orange)", color: "var(--orange)" }}
                         />
                       ))}
                     </div>
-                    <p className="mt-6 font-display text-xl leading-snug">"{t.text}"</p>
+                    <p className="mt-6 font-display text-xl leading-snug text-white/90">"{t.text}"</p>
                   </div>
                   <div className="mt-8 flex items-center gap-3">
                     {t.image ? (
@@ -1205,7 +1535,7 @@ function NewsSection() {
   if (!customNews || customNews.length === 0) return null;
 
   return (
-    <section id="news" className="section-pad relative">
+    <section id="news" className="section-pad relative" style={{ background: "var(--navy-mid)" }}>
       <div className="mx-auto max-w-7xl px-6">
         <div className="max-w-2xl">
           <Reveal>
@@ -1244,7 +1574,8 @@ function NewsSection() {
                       href={news.link}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-sky-400 hover:underline"
+                      className="mt-6 inline-flex items-center gap-2 text-xs font-semibold hover:underline"
+                      style={{ color: "var(--orange-light)" }}
                     >
                       اقرأ المقال <ExternalLink className="h-3 w-3" />
                     </a>
@@ -1285,7 +1616,7 @@ function FAQ() {
   ];
   const [open, setOpen] = useState<number | null>(0);
   return (
-    <section className="section-pad relative">
+    <section className="section-pad relative" style={{ background: "var(--navy-deep)" }}>
       <div className="mx-auto max-w-4xl px-6">
         <div className="text-center">
           <Reveal>
@@ -1300,7 +1631,13 @@ function FAQ() {
         <div className="mt-16 space-y-3">
           {faqs.map((f, i) => (
             <Reveal key={i} delay={i * 0.04}>
-              <div className="overflow-hidden rounded-2xl border border-white/8 bg-card">
+              <div
+                className="overflow-hidden rounded-2xl transition-all duration-300"
+                style={{
+                  background: open === i ? "rgba(46, 51, 97, 0.6)" : "rgba(46, 51, 97, 0.3)",
+                  border: open === i ? "1px solid rgba(255, 100, 43, 0.35)" : "1px solid rgba(255,255,255,0.07)",
+                }}
+              >
                 <button
                   onClick={() => setOpen(open === i ? null : i)}
                   className="flex w-full items-center justify-between gap-6 px-6 py-6 text-left"
@@ -1308,7 +1645,12 @@ function FAQ() {
                   <span className="font-display text-lg font-semibold md:text-xl">{f.q}</span>
                   <motion.span
                     animate={{ rotate: open === i ? 45 : 0 }}
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/15"
+                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-full transition-colors"
+                    style={{
+                      border: open === i ? "1px solid rgba(255,100,43,0.5)" : "1px solid rgba(255,255,255,0.15)",
+                      color: open === i ? "var(--orange)" : "white",
+                    }}
                   >
                     <span className="text-xl leading-none">+</span>
                   </motion.span>
@@ -1319,9 +1661,9 @@ function FAQ() {
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.3 }}
+                      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                     >
-                      <p className="px-6 pb-6 text-muted-foreground">{f.a}</p>
+                      <p className="px-6 pb-6 text-white/70">{f.a}</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -1342,7 +1684,14 @@ function Contact() {
   const cleanWa = waNum.replace(/[^0-9]/g, "");
 
   return (
-    <section id="contact" className="section-pad relative">
+    <section id="contact" className="section-pad relative" style={{ background: "var(--navy-mid)" }}>
+      <div
+        className="absolute inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(ellipse at 100% 100%, rgba(255, 100, 43, 0.1), transparent 55%)",
+        }}
+      />
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
@@ -1384,11 +1733,14 @@ function Contact() {
                 <a
                   key={r.label}
                   href={r.href}
-                  className="group flex items-center gap-4 rounded-2xl border border-white/8 bg-card p-4 transition-colors hover:border-white/20"
+                  className="group flex items-center gap-4 rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5"
+                  style={{ background: "rgba(26, 31, 62, 0.6)", border: "1px solid rgba(255,255,255,0.08)" }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(255, 100, 43, 0.35)")}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)")}
                 >
                   <div
                     className="grid h-11 w-11 place-items-center rounded-xl"
-                    style={{ background: "var(--gradient-brand)" }}
+                    style={{ background: "var(--gradient-brand)", boxShadow: "0 4px 16px -4px rgba(255, 100, 43, 0.4)" }}
                   >
                     <r.icon className="h-5 w-5 text-white" />
                   </div>
@@ -1421,7 +1773,13 @@ function Contact() {
                 e.preventDefault();
                 setSent(true);
               }}
-              className="glass rounded-3xl p-8 md:p-10"
+              className="rounded-3xl p-8 md:p-10"
+              style={{
+                background: "rgba(26, 31, 62, 0.7)",
+                border: "1px solid rgba(255, 100, 43, 0.2)",
+                backdropFilter: "blur(24px)",
+                boxShadow: "0 24px 64px -20px rgba(0,0,0,0.5)",
+              }}
             >
               <h3 className="font-display text-2xl font-bold">أرسل رسالة</h3>
               <div className="mt-8 grid gap-5">
@@ -1432,7 +1790,12 @@ function Contact() {
                   <label className="mb-2 block text-xs uppercase tracking-widest text-muted-foreground">
                     الرياضة المفضلة
                   </label>
-                  <select className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-white/30">
+                  <select
+                    className="w-full rounded-xl px-4 py-3 outline-none transition-colors"
+                    style={{ background: "rgba(46, 51, 97, 0.4)", border: "1px solid rgba(255,255,255,0.1)", color: "white" }}
+                    onFocus={e => (e.currentTarget.style.borderColor = "rgba(255, 100, 43, 0.5)")}
+                    onBlur={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}
+                  >
                     {[
                       "كرة القدم",
                       "السباحة",
@@ -1452,7 +1815,10 @@ function Contact() {
                   </label>
                   <textarea
                     rows={4}
-                    className="w-full resize-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-white/30"
+                    className="w-full resize-none rounded-xl px-4 py-3 outline-none transition-colors"
+                    style={{ background: "rgba(46, 51, 97, 0.4)", border: "1px solid rgba(255,255,255,0.1)", color: "white" }}
+                    onFocus={e => (e.currentTarget.style.borderColor = "rgba(255, 100, 43, 0.5)")}
+                    onBlur={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}
                   />
                 </div>
                 <button type="submit" className="btn-primary mt-2 w-full justify-center">
@@ -1481,7 +1847,10 @@ function Field({ label, name, type = "text" }: { label: string; name: string; ty
         id={name}
         name={name}
         type={type}
-        className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 outline-none transition-colors focus:border-white/30"
+        className="w-full rounded-xl px-4 py-3 outline-none transition-colors"
+        style={{ background: "rgba(46, 51, 97, 0.4)", border: "1px solid rgba(255,255,255,0.1)", color: "white" }}
+        onFocus={e => (e.currentTarget.style.borderColor = "rgba(255, 100, 43, 0.5)")}
+        onBlur={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}
       />
     </div>
   );
@@ -1493,7 +1862,7 @@ function Footer() {
   const brandName = generalSettings?.academyName || "APEX";
 
   return (
-    <footer className="relative border-t border-white/5 bg-black/40 py-16">
+    <footer className="relative py-16" style={{ background: "var(--navy-deepest)", borderTop: "1px solid rgba(255, 100, 43, 0.15)" }}>
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
@@ -1515,7 +1884,10 @@ function Footer() {
                   key={i}
                   href="#"
                   aria-label="social"
-                  className="grid h-10 w-10 place-items-center rounded-full border border-white/10 transition-colors hover:bg-white hover:text-black"
+                  className="grid h-10 w-10 place-items-center rounded-full transition-all duration-200"
+                  style={{ border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)" }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "var(--orange)"; e.currentTarget.style.borderColor = "var(--orange)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
                 >
                   <I className="h-4 w-4" />
                 </a>
